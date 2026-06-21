@@ -1,0 +1,47 @@
+{
+  "login_id": "16015",
+  "password": "fusao",
+  "url": "http://172.16.10.94:8081/dr/login.jsp",
+  "task_list": [
+    {
+      "title": "ミーティング",
+      "tasks": [
+        {
+          "title": "夕会",
+          "project_cd": "AAADH0001:",
+          "process_cd": "670",
+          "default_time": "0.5"
+        },
+        {
+          "title": "週例",
+          "project_cd": "AAADH0001:",
+          "process_cd": "671",
+          "default_time": "1.0"
+        },
+        {
+          "title": "勉強会",
+          "project_cd": "AAAPD0002:",
+          "process_cd": "113",
+          "default_time": "1.0"
+        }
+      ]
+    },
+    {
+      "title": "チーム活動",
+      "tasks": [
+        {
+          "title": "夕会",
+          "project_cd": "AAADH0001:",
+          "process_cd": "670",
+          "default_time": "0.5"
+        },
+        {
+          "title": "週例",
+          "project_cd": "AAADH0001:",
+          "process_cd": "671",
+          "default_time": "1.0"
+        }
+      ]
+    }
+  ]
+}

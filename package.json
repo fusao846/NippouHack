@@ -1,0 +1,11 @@
+{
+  "devDependencies": {
+    "electron": "^41.7.1"
+  },
+  "main": "main.js",
+  "dependencies": {
+    "decimal.js": "^10.6.0",
+    "electron-store": "^11.0.2",
+    "fs": "^0.0.1-security"
+  }
+}

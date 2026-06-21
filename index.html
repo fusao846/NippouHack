@@ -1,0 +1,311 @@
+<link rel="stylesheet" type="text/css" href="style.css">
+
+<table width="100%" cellspacing="0" cellpadding="0">
+  <tbody>
+    <tr>
+      <td class="tborder">
+        <table width="100%" cellspacing="0" cellpadding="0">
+          <tbody>
+            <tr>
+              <td class="title">プロジェクト<font color="red">ハッキング</font>システム</td>
+              <td class=" version">version 9.99</td>
+            </tr>
+          </tbody>
+        </table>
+      </td>
+    </tr>
+
+</table>
+<div id="dateList" style="display:flex; margin:10px;">Loading....</div>
+<div id="projectList" style="width:80%"></div>
+<div id="projectChips" style="display:flex;margin:5px;flex-wrap:wrap;"></div>
+<div id="nippouList"></div>
+
+<pre>
+ TODO
+ 日付の×は即更新
+ 初期Loading...時はカーソルを砂時計にする
+</pre>
+<script src="https://cdn.jsdelivr.net/npm/decimal.js"></script>
+<script>
+  let selectedDate = null;
+  let dateButtons = [];
+  let nippous = [];
+  let CHIPS = [];
+  const PROJECT_CHIPS_KEY = 'ProjectChipsKey';
+
+  window.api.onInitDates(async (dates, projectListData) => {
+
+    const container = document.getElementById('dateList');
+    container.innerHTML = "";
+
+    dates.forEach((date, index) => {
+
+      const md = date.slice(5);
+
+      const dateButton = document.createElement("div");
+      dateButton.innerText = md;
+      dateButton.className = "date_btn " + (index === 0 ? "date_btn_selected" : "date_btn_not_selected");
+      container.appendChild(dateButton);
+      dateButtons.push(dateButton);
+      dateButton.addEventListener("click", () => {
+        if (dateButton.classList.contains('date_btn_diabled')) return;
+        selectedDate = date;
+        dateButtons.forEach(btn => btn.classList.remove("date_btn_selected"));
+        dateButtons.forEach(btn => btn.classList.add("date_btn_not_selected"));
+        dateButton.classList.add("date_btn_selected");
+        //document.getElementById('main').style.display = 'block';
+      });
+    });
+    selectedDate = dates[0];
+    console.log("●Received date button created");
+    const projectList = document.getElementById('projectList');
+    const projectListSelect = document.createElement('select');
+    projectListSelect.id = "projectListSelect";
+    projectListSelect.className = "project_list_select";
+    projectListSelect.addEventListener('change', (e) => {
+      if (e.target.value === '') return;
+      const codes = e.target.value.split('-');
+      const names = e.target.options[e.target.selectedIndex].text.split('-');
+      const exists = nippous.some(item =>
+        item.projectCode === codes[0] && item.processCode === codes[1]
+      )
+      if (exists) return;
+      const isExist = nippous.filter((n) => {
+        return (n.projectCode == codes[0] && n.processCode == codes[1]);
+      });
+      if (isExist.length > 0) return;
+      nippous.push({
+        projectCode: codes[0],
+        projectName: names[0],
+        processCode: codes[1],
+        processName: names[1],
+        hour: 0.5
+      });
+      makeNippouList();
+    });
+    console.log("●projectListData:", projectListData.length);
+    const blank = document.createElement('option');
+    blank.value = '';
+    blank.text = '選択してください';
+    projectListSelect.appendChild(blank);
+
+    projectListData.forEach(project => {
+      project.processList.forEach(process => {
+        const option = document.createElement('option');
+        option.value = project.projectCode + "-" + process.processCode;
+        option.text = project.projectName + "-" + process.processName;
+        projectListSelect.appendChild(option);
+      });
+    });
+    projectList.appendChild(projectListSelect);
+
+    CHIPS = await window.api.get(PROJECT_CHIPS_KEY);
+    if (!CHIPS) {
+      CHIPS = [];
+    }
+    console.log('●CHIPS', CHIPS);
+    displayChips();
+  });
+
+  const displayChips = () => {
+    const projectChips = document.getElementById('projectChips');
+    projectChips.innerHTML = "";
+
+    const priorityWords = ["【DH】", "【PD】", "【ALL】勤怠関連", "【ALL】"];
+
+    const getRank = (name) => {
+      const idx = priorityWords.findIndex(w => name.includes(w));
+      return idx === -1 ? priorityWords.length : idx;
+    };
+
+    CHIPS.sort((a, b) => {
+      const rankDiff = getRank(a.projectName) - getRank(b.projectName);
+      if (rankDiff !== 0) return rankDiff;
+      if (a.projectCode != b.projectCode) return a.projectCode.localeCompare(b.projectCode, "ja");
+      if (a.processCode != b.processCode) return a.processCode.localeCompare(b.processCode, "ja");
+      const da = new Decimal(a.hour);
+      const db = new Decimal(b.hour);
+      return da.lessThan(db) ? -1 : 1;
+    });
+
+    for (const chip of CHIPS) {
+      const chipEle = createProjectChip(
+        chip.projectCode,
+        chip.projectName,
+        chip.processCode,
+        chip.processName,
+        chip.hour
+      );
+      projectChips.appendChild(chipEle);
+    }
+  }
+
+  const makeNippouList = () => {
+    let html = '<table class="t1">';
+    html += '<tr><th width=30px>削</th><th width=800px>タスク</th><th>時間</th><th>調整</th></tr>';
+    let idx = 0;
+    let totalHour = new Decimal(0);
+    nippous.forEach(nippou => {
+      const select = makeHourSelect(`sel-${idx}`, new Decimal(nippou.hour));
+      html += `<tr>
+              <td align="center"><img src="image/trash.png" onClick=deleteNippou(${idx}) class="batsu" style="margin:0" /></div></td>
+              <td>${nippou.projectName}-${nippou.processName}</td><td>${select}</td>
+              <td align="center"><img src="image/time.png" onClick=adjustRemain(${idx}) class="pm" /></td>
+              </tr>`;
+      idx++;
+      totalHour = totalHour.plus(nippou.hour);
+    });
+    html += `<tr><td colspan=2>合計</td><td align="center">${totalHour.toFixed(1)}</td><td></td></tr>`;
+    html += `<tr><td colspan=5><button onClick=submit()>送信</button></tr>`;
+    html += '</table>';
+    const nippouList = document.getElementById('nippouList');
+
+    nippouList.innerHTML = html;
+  }
+  const deleteNippou = (idx) => {
+    nippous.splice(idx, 1);
+    makeNippouList();
+  }
+  const adjustRemain = (idx) => {
+    let total = new Decimal(0);
+    for (let i = 0; i < nippous.length; i++) {
+      if (i != idx) {
+        total = total.plus(nippous[i].hour);
+      }
+    }
+    const remain = new Decimal(8).minus(total);
+    nippous[idx].hour = remain.toFixed(1);
+    makeNippouList();
+  }
+  const makeHourSelect = (id, defaultHour) => {
+    let html = `<select id="${id}" onChange="hourSelect(this)">`;
+    let selected = '';
+    for (let h = new Decimal(0); h.lessThanOrEqualTo(8); h = h.plus('0.5')) {
+      console.log('●h', h);
+      selected = h.equals(defaultHour) ? ' selected ' : '';
+      let hStr = h.toFixed(1);
+      console.log('●hStr', hStr);
+      html += `<option value="${hStr}" ${selected}>${hStr}</option>`;
+    }
+
+    html += '</select>';
+    return html;
+  }
+  const hourSelect = (ele) => {
+    console.log('●ele', ele.id, ele.value);
+    const idx = parseInt(ele.id.split('-')[1]);
+    nippous[idx].hour = ele.value;
+    makeNippouList();
+  }
+
+  const createProjectChip = (projectCode, projectName, processCode, processName, defaultHour) => {
+    const chip = document.createElement("div");
+    chip.className = "project_chip";
+    const label = document.createElement("div");
+    chip.appendChild(label);
+    let bg = "#9f9fff";
+    if (projectName.indexOf("【DH】") >= 0) bg = "#ffd700";
+    if (projectName.indexOf("【PD】") >= 0) bg = "#adff2f";
+    if (projectName.indexOf("【ALL】") >= 0) bg = "#d8bfd8";
+    chip.style.background = bg;
+    label.innerText = `${projectName} - ${processName}(${defaultHour})`;
+    chip.id = `${projectCode}|${processCode}|${defaultHour}`;
+    label.addEventListener("click", () => {
+      const exists = nippous.some(item =>
+        item.projectCode === projectCode && item.processCode === processCode
+      );
+      if (exists) return;
+      nippous.push({
+        projectCode: projectCode,
+        projectName: projectName,
+        processCode: processCode,
+        processName: processName,
+        hour: defaultHour
+      });
+      makeNippouList();
+    });
+    const trash = document.createElement("img");
+    trash.src = "image/trash.png";
+    trash.className = "batsu";
+    trash.addEventListener("click", () => {
+      handleDelete(projectCode, processCode, defaultHour);
+    });
+
+    chip.appendChild(trash);
+    return chip;
+  };
+  const handleDelete = (projectCode, processCode, defaultHour) => {
+    const chipId = `${projectCode}|${processCode}|${defaultHour}`;
+    const chip = document.getElementById(chipId);
+    if (chip) {
+      chip.remove();
+    }
+    const index = CHIPS.findIndex(item =>
+      item.projectCode === projectCode &&
+      item.processCode === processCode &&
+      item.hour === defaultHour
+    );
+    if (index >= 0) {
+      CHIPS.splice(index, 1);
+    }
+  };
+  // ✅ 送信ボタン
+  function submit() {
+    if (!selectedDate) {
+      alert("日付選択なし");
+      return;
+    }
+    const tasks = {
+      date: selectedDate,
+      tasks: []
+    };
+    nippous.forEach(nippou => {
+      tasks.tasks.push({
+        projectCode: nippou.projectCode,
+        processCode: nippou.processCode,
+        projectName: nippou.projectName,
+        processName: nippou.processName,
+        hour: new Decimal(nippou.hour).toFixed(1)
+      });
+    });
+    console.log('●nippous', nippous);
+
+    async function submitWork(tasks) {
+      document.body.style.cursor = "progress";
+      for (const task of tasks.tasks) {
+        const param = {
+          date: tasks.date,
+          projectCode: task.projectCode,
+          processCode: task.processCode,
+          hour: task.hour
+        };
+        const exists = CHIPS.some(item =>
+          item.projectCode === task.projectCode &&
+          item.processCode === task.processCode &&
+          item.hour === task.hour
+        );
+        if (!exists) {
+          CHIPS.push(task);
+        }
+        console.log('●param', param);
+        const res = await window.api.submitWork(param);
+      }
+      console.log('●CHIPS', CHIPS);
+      displayChips();
+      await window.api.set(PROJECT_CHIPS_KEY, CHIPS);
+      for (const dateButton of dateButtons) {
+        if (dateButton.classList.contains('date_btn_selected')) {
+          dateButton.classList.remove('date_btn_selected');
+          dateButton.classList.add('date_btn_disabled');
+          break;
+        }
+      }
+      selectedDate = null;
+      document.body.style.cursor = "default";
+      alert('登録完了');
+    }
+    submitWork(tasks);
+  }
+
+</script>
