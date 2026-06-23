@@ -36,6 +36,8 @@
 
   window.api.onInitDates(async (dates, projectListData) => {
 
+    document.body.style.cursor = "progress";
+
     const container = document.getElementById('dateList');
     container.innerHTML = "";
 
@@ -106,6 +108,7 @@
     }
     console.log('●CHIPS', CHIPS);
     displayChips();
+    document.body.style.cursor = "default";
   });
 
   const displayChips = () => {
