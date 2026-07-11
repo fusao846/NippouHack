@@ -1,0 +1,28 @@
+{
+  "login_id": "",
+  "password": "",
+  "url": "http://172.16.10.94:8081/dr/login.jsp",
+  "project_sort_order": [
+    "【DH】",
+    "【PD】",
+    "【ALL】勤怠関連",
+    "【ALL】"
+  ],
+  "project_colors": [
+    {
+      "name": "【DH】",
+      "color": "#ffd700"
+    },
+    {
+      "name": "【PD】",
+      "color": "#adff2f"
+    },
+    {
+      "name": "【ALL】",
+      "color": "#d8bfd8"
+    }
+  ],
+  "dev_tool": false,
+  "browser_open": false,
+  "browser_dev_tool": false
+}
