@@ -767,6 +767,10 @@ pre {
     color: #000000;
 }
 
+.date_btn_not_selected:hover {
+    background: #d0d0d0;
+}
+
 .date_btn_selected {
     background: #41af47;
     color: #000000;
@@ -835,12 +839,19 @@ table th {
     padding: 10px;
     font-weight: bold;
     vertical-align: middle;
+    text-align: center;
     border: 1px solid #161414;
-    background: #667fff;
+    background: #c7cef1;
 }
 
 table td {
     vertical-align: middle;
     border: 1px solid #161414;
     background: #e0e6eb;
+}
+
+select {
+    padding: 4px;
+    font-size: 16px;
+    height: 40px;
 }

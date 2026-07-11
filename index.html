@@ -1,5 +1,5 @@
 <link rel="stylesheet" type="text/css" href="style.css">
-
+<link rel="icon" href="image/favicon.ico" type="image/x-icon">
 <table width="100%" cellspacing="0" cellpadding="0">
   <tbody>
     <tr>
@@ -7,8 +7,8 @@
         <table width="100%" cellspacing="0" cellpadding="0">
           <tbody>
             <tr>
-              <td class="title">プロジェクト<font color="red">ハッキング</font>システム</td>
-              <td class=" version">version 9.99</td>
+              <td class="title">今日もお疲れさまでした</td>
+              <td class=" version">version 1.00</td>
             </tr>
           </tbody>
         </table>
@@ -17,14 +17,10 @@
 
 </table>
 <div id="dateList" style="display:flex; margin:10px;">Loading....</div>
-<div id="projectList" style="width:80%"></div>
 <div id="projectChips" style="display:flex;margin:5px;flex-wrap:wrap;"></div>
 <div id="nippouList"></div>
 
 <pre>
- TODO
- 日付の×は即更新
- 初期Loading...時はカーソルを砂時計にする
 </pre>
 <script src="https://cdn.jsdelivr.net/npm/decimal.js"></script>
 <script>
@@ -32,11 +28,21 @@
   let dateButtons = [];
   let nippous = [];
   let CHIPS = [];
+  let settings = null;
+  let projectListData = [];
+  document.body.style.cursor = "progress";
+
   const PROJECT_CHIPS_KEY = 'ProjectChipsKey';
 
-  window.api.onInitDates(async (dates, projectListData) => {
+  window.api.onInitDates(async (stats, _settings, dates, _projectListData) => {
+    projectListData = _projectListData;
+    settings = _settings;
+    if (stats.status === 'ERROR') {
+      alert(stats.message);
+      const res = await window.api.submitWork({ action: 'close' });
+    }
 
-    document.body.style.cursor = "progress";
+    await new Promise(requestAnimationFrame);
 
     const container = document.getElementById('dateList');
     container.innerHTML = "";
@@ -60,8 +66,19 @@
       });
     });
     selectedDate = dates[0];
-    console.log("●Received date button created");
-    const projectList = document.getElementById('projectList');
+
+
+    CHIPS = await window.api.get(PROJECT_CHIPS_KEY);
+    if (!CHIPS) {
+      CHIPS = [];
+    }
+    console.log('●CHIPS', CHIPS);
+    displayChips();
+    makeNippouList();
+    document.body.style.cursor = "default";
+  });
+
+  const makeProjectSelect = (projectList) => {
     const projectListSelect = document.createElement('select');
     projectListSelect.id = "projectListSelect";
     projectListSelect.className = "project_list_select";
@@ -102,20 +119,13 @@
     });
     projectList.appendChild(projectListSelect);
 
-    CHIPS = await window.api.get(PROJECT_CHIPS_KEY);
-    if (!CHIPS) {
-      CHIPS = [];
-    }
-    console.log('●CHIPS', CHIPS);
-    displayChips();
-    document.body.style.cursor = "default";
-  });
+  }
 
   const displayChips = () => {
     const projectChips = document.getElementById('projectChips');
     projectChips.innerHTML = "";
 
-    const priorityWords = ["【DH】", "【PD】", "【ALL】勤怠関連", "【ALL】"];
+    const priorityWords = settings.project_sort_order;
 
     const getRank = (name) => {
       const idx = priorityWords.findIndex(w => name.includes(w));
@@ -145,8 +155,8 @@
   }
 
   const makeNippouList = () => {
-    let html = '<table class="t1">';
-    html += '<tr><th width=30px>削</th><th width=800px>タスク</th><th>時間</th><th>調整</th></tr>';
+    let html = '<table class="t1" style="margin:10px;width:98%;">';
+    html += '<tr><th width=30px>削</th><th width="80%">タスク</th><th>時間</th><th>調整</th></tr>';
     let idx = 0;
     let totalHour = new Decimal(0);
     nippous.forEach(nippou => {
@@ -159,12 +169,13 @@
       idx++;
       totalHour = totalHour.plus(nippou.hour);
     });
+    html += `<tr><td></td><td><div id="projectList"></div></td><td></dt><td></td></tr>`;
     html += `<tr><td colspan=2>合計</td><td align="center">${totalHour.toFixed(1)}</td><td></td></tr>`;
-    html += `<tr><td colspan=5><button onClick=submit()>送信</button></tr>`;
+    html += `<tr><td colspan=5 align="center"><button onClick=submit() style="height:40px;width:100px;font-size:16px;">送信</button></tr>`;
     html += '</table>';
     const nippouList = document.getElementById('nippouList');
-
     nippouList.innerHTML = html;
+    makeProjectSelect(document.getElementById('projectList'));
   }
   const deleteNippou = (idx) => {
     nippous.splice(idx, 1);
@@ -182,13 +193,11 @@
     makeNippouList();
   }
   const makeHourSelect = (id, defaultHour) => {
-    let html = `<select id="${id}" onChange="hourSelect(this)">`;
+    let html = `<select id="${id}" onChange="hourSelect(this)" style="width:100%;height:40px;font-size:24px;">`;
     let selected = '';
     for (let h = new Decimal(0); h.lessThanOrEqualTo(8); h = h.plus('0.5')) {
-      console.log('●h', h);
       selected = h.equals(defaultHour) ? ' selected ' : '';
       let hStr = h.toFixed(1);
-      console.log('●hStr', hStr);
       html += `<option value="${hStr}" ${selected}>${hStr}</option>`;
     }
 
@@ -208,11 +217,14 @@
     const label = document.createElement("div");
     chip.appendChild(label);
     let bg = "#9f9fff";
-    if (projectName.indexOf("【DH】") >= 0) bg = "#ffd700";
-    if (projectName.indexOf("【PD】") >= 0) bg = "#adff2f";
-    if (projectName.indexOf("【ALL】") >= 0) bg = "#d8bfd8";
+    for (const colors of settings.project_colors) {
+      if (projectName.indexOf(colors.name) >= 0) {
+        bg = colors.color;
+        break;
+      }
+    }
     chip.style.background = bg;
-    label.innerText = `${projectName} - ${processName}(${defaultHour})`;
+    label.innerHTML = `${projectName} - ${processName}<span style="font-size: 28px; font-weight: bold; color: #f00;margin-left: 10px;">${defaultHour}</span></div>`;
     chip.id = `${projectCode}|${processCode}|${defaultHour}`;
     label.addEventListener("click", () => {
       const exists = nippous.some(item =>
@@ -238,7 +250,7 @@
     chip.appendChild(trash);
     return chip;
   };
-  const handleDelete = (projectCode, processCode, defaultHour) => {
+  const handleDelete = async (projectCode, processCode, defaultHour) => {
     const chipId = `${projectCode}|${processCode}|${defaultHour}`;
     const chip = document.getElementById(chipId);
     if (chip) {
@@ -252,6 +264,7 @@
     if (index >= 0) {
       CHIPS.splice(index, 1);
     }
+    await window.api.set(PROJECT_CHIPS_KEY, CHIPS);
   };
   // ✅ 送信ボタン
   function submit() {
@@ -272,12 +285,12 @@
         hour: new Decimal(nippou.hour).toFixed(1)
       });
     });
-    console.log('●nippous', nippous);
 
     async function submitWork(tasks) {
       document.body.style.cursor = "progress";
       for (const task of tasks.tasks) {
         const param = {
+          action: 'submit',
           date: tasks.date,
           projectCode: task.projectCode,
           processCode: task.processCode,
