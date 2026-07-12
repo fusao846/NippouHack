@@ -855,3 +855,13 @@ select {
     font-size: 16px;
     height: 40px;
 }
+
+.gear {
+    width: 26px;
+    height: 26px;
+}
+
+.gear:hover {
+    cursor: pointer;
+    background: #eeeeee;
+}

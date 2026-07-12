@@ -1,4 +1,5 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
+const { spawn } = require('child_process');
 const { Menu } = require('electron');
 const fs = require('fs');
 const Store = require('electron-store').default;
@@ -10,20 +11,39 @@ Menu.setApplicationMenu(null); // メニューバーを消す
 
 let mainWin;
 let hiddenWin;
+
+let settings = {};
+let LOGIN_ID = '';
+let LOGIN_PW = '';
+let LOGIN_URL = '';
+let DEV_TOOL = false;
+let BROWSER_OPEN = false;
+let BROWSER_DEV_TOOL = false;
+const WIDTH = 1200;
+const HEIGHT = 700;
+
+
 const settingsPath = path.join(
   app.getPath("userData"),
   "settings.json"
 );
-console.log("settingsPath", settingsPath);
-const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
-console.log("settings", settings);
-const LOGIN_ID = settings.login_id;
-const LOGIN_PW = settings.password;
-const LOGIN_URL = settings.url;
-const DEV_TOOL = settings.dev_tool;
-const BROWSER_OPEN = settings.browser_open;
-const BROWSER_DEV_TOOL = settings.browser_win_dev_tool;
-const HEIGHT = 700;
+const getSettings = () => {
+
+  console.log("settingsPath", settingsPath);
+  settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
+  console.log("settings", settings);
+  LOGIN_ID = settings.login_id;
+  LOGIN_PW = settings.password;
+  LOGIN_URL = settings.url;
+  DEV_TOOL = settings.dev_tool;
+  BROWSER_OPEN = settings.browser_open;
+  BROWSER_DEV_TOOL = settings.browser_dev_tool;
+  console.log("LOGIN_ID", LOGIN_ID);
+  console.log("LOGIN_PW", LOGIN_PW);
+  console.log("LOGIN_URL", LOGIN_URL);
+}
+
+getSettings();
 
 const store = new Store({
   projectName: 'NippouHack'
@@ -70,7 +90,7 @@ function checkNetworkType(ip) {
 
 function createWindow() {
   mainWin = new BrowserWindow({
-    width: 1000,
+    width: WIDTH,
     height: HEIGHT,
     webPreferences: {
       contextIsolation: true,
@@ -112,7 +132,7 @@ app.whenReady().then(createWindow);
 async function init() {
   try {
     console.log("★開始");
-
+    getSettings();
     const ip = getLocalIPv4();
     console.log('IP:', ip);
     const networkResult = checkNetworkType(ip);
@@ -121,17 +141,21 @@ async function init() {
       await sleep(2000);
       mainWin.webContents.send('init-dates',
         {
-          status: 'ERROR',
+          status: 'ERROR_NETWORK',
           message: '社内LANに接続していません\n社内LANに接続してから再度起動してください'
         },
         settings, null, null);
       return;
     }
+    console.log("★ログイン情報確認");
+    console.log("LOGIN_ID", LOGIN_ID);
+    console.log("LOGIN_PW", LOGIN_PW);
+    console.log("settings", settings);
     if (!LOGIN_ID || !LOGIN_PW) {
       await sleep(2000);
       mainWin.webContents.send('init-dates',
         {
-          status: 'ERROR',
+          status: 'ERROR_LOGIN',
           message: `ログイン情報が設定されていません\n${settingsPath}を確認してください`
         },
         settings, null, null);
@@ -156,6 +180,7 @@ async function init() {
       hiddenWin.setBounds(200, mainH);
     };
     mainWin.once('ready-to-show', syncWindowPosition);
+    hiddenWin.once('ready-to-show', syncWindowPosition);
     mainWin.on('move', syncWindowPosition);
     mainWin.on('resize', syncWindowPosition);
     mainWin.on('close', () => {
@@ -201,8 +226,8 @@ async function init() {
       await sleep(2000);
       mainWin.webContents.send('init-dates',
         {
-          status: 'ERROR',
-          message: `ログインに失敗しました\n${settingsPath}を確認してください`
+          status: 'ERROR_LOGIN',
+          message: `ログインに失敗しました\n設定ファイルを確認してください`
         },
         settings, null, null);
       return;
@@ -258,6 +283,18 @@ ipcMain.handle('submitWork', async (event, param) => {
   console.log('★submitWork tasks', param);
   if (param.action === 'close') {
     app.quit();
+    return;
+  }
+  if (param.action === 'editSettings') {
+    const child = spawn('notepad.exe', [settingsPath]);
+    await new Promise((resolve, reject) => {
+      child.on('close', resolve);
+      child.on('error', reject);
+    });
+    return;
+  }
+  if (param.action === 'init') {
+    await init();
     return;
   }
 

@@ -9,6 +9,7 @@
             <tr>
               <td class="title">今日もお疲れさまでした</td>
               <td class=" version">version 1.00</td>
+              <td class="title" align="right"><img src="image/gear.png" class="gear" onClick="editSettings()" /></td>
             </tr>
           </tbody>
         </table>
@@ -24,6 +25,8 @@
 </pre>
 <script src="https://cdn.jsdelivr.net/npm/decimal.js"></script>
 <script>
+  // TODO
+  // ログイン失敗時に、settings.jsonを開き、編集後、再起動を促す
   let selectedDate = null;
   let dateButtons = [];
   let nippous = [];
@@ -35,11 +38,18 @@
   const PROJECT_CHIPS_KEY = 'ProjectChipsKey';
 
   window.api.onInitDates(async (stats, _settings, dates, _projectListData) => {
+    console.log('●onInitDates', stats, _settings, dates, _projectListData);
     projectListData = _projectListData;
     settings = _settings;
-    if (stats.status === 'ERROR') {
+    if (stats.status === 'ERROR_NETWORK') {
       alert(stats.message);
       const res = await window.api.submitWork({ action: 'close' });
+    }
+    if (stats.status === 'ERROR_LOGIN') {
+      alert(stats.message);
+      await window.api.submitWork({ action: 'editSettings' });
+      alert('設定ファイルが変更されました。\n再度ログインを試みます。');
+      await window.api.submitWork({ action: 'init' });
     }
 
     await new Promise(requestAnimationFrame);
@@ -322,6 +332,10 @@
       alert('登録完了');
     }
     submitWork(tasks);
+  }
+  const editSettings = async () => {
+    await window.api.submitWork({ action: 'editSettings' });
+
   }
 
 </script>
