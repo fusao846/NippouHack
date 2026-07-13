@@ -1,4 +1,5 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
+const { spawn } = require('child_process');
 const { Menu } = require('electron');
 const fs = require('fs');
 const Store = require('electron-store').default;
@@ -10,20 +11,37 @@ Menu.setApplicationMenu(null); // メニューバーを消す
 
 let mainWin;
 let hiddenWin;
+
+let settings = {};
+let LOGIN_ID = '';
+let LOGIN_PW = '';
+let LOGIN_URL = '';
+let DEV_TOOL = false;
+let BROWSER_OPEN = false;
+let BROWSER_DEV_TOOL = false;
+const WIDTH = 1200;
+const HEIGHT = 900;
+
+
 const settingsPath = path.join(
   app.getPath("userData"),
   "settings.json"
 );
-console.log("settingsPath", settingsPath);
-const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
-console.log("settings", settings);
-const LOGIN_ID = settings.login_id;
-const LOGIN_PW = settings.password;
-const LOGIN_URL = settings.url;
-const DEV_TOOL = settings.dev_tool;
-const BROWSER_OPEN = settings.browser_open;
-const BROWSER_DEV_TOOL = settings.browser_win_dev_tool;
-const HEIGHT = 700;
+const getSettings = () => {
+
+  settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
+  LOGIN_ID = settings.login_id;
+  LOGIN_PW = settings.password;
+  LOGIN_URL = settings.url;
+  DEV_TOOL = settings.dev_tool;
+  BROWSER_OPEN = settings.browser_open;
+  BROWSER_DEV_TOOL = settings.browser_dev_tool;
+  console.log("LOGIN_ID", LOGIN_ID);
+  console.log("LOGIN_PW", LOGIN_PW);
+  console.log("LOGIN_URL", LOGIN_URL);
+}
+
+getSettings();
 
 const store = new Store({
   projectName: 'NippouHack'
@@ -70,7 +88,7 @@ function checkNetworkType(ip) {
 
 function createWindow() {
   mainWin = new BrowserWindow({
-    width: 1000,
+    width: WIDTH,
     height: HEIGHT,
     webPreferences: {
       contextIsolation: true,
@@ -112,7 +130,7 @@ app.whenReady().then(createWindow);
 async function init() {
   try {
     console.log("★開始");
-
+    getSettings();
     const ip = getLocalIPv4();
     console.log('IP:', ip);
     const networkResult = checkNetworkType(ip);
@@ -121,18 +139,22 @@ async function init() {
       await sleep(2000);
       mainWin.webContents.send('init-dates',
         {
-          status: 'ERROR',
+          status: 'ERROR_NETWORK',
           message: '社内LANに接続していません\n社内LANに接続してから再度起動してください'
         },
         settings, null, null);
       return;
     }
+    console.log("★ログイン情報確認");
+    console.log("LOGIN_ID", LOGIN_ID);
+    console.log("LOGIN_PW", LOGIN_PW);
+    console.log("settings", settings);
     if (!LOGIN_ID || !LOGIN_PW) {
       await sleep(2000);
       mainWin.webContents.send('init-dates',
         {
-          status: 'ERROR',
-          message: `ログイン情報が設定されていません\n${settingsPath}を確認してください`
+          status: 'ERROR_LOGIN',
+          message: `ログイン情報が設定されていません\n設定ファイルを確認してください`
         },
         settings, null, null);
       return;
@@ -156,6 +178,7 @@ async function init() {
       hiddenWin.setBounds(200, mainH);
     };
     mainWin.once('ready-to-show', syncWindowPosition);
+    hiddenWin.once('ready-to-show', syncWindowPosition);
     mainWin.on('move', syncWindowPosition);
     mainWin.on('resize', syncWindowPosition);
     mainWin.on('close', () => {
@@ -201,8 +224,8 @@ async function init() {
       await sleep(2000);
       mainWin.webContents.send('init-dates',
         {
-          status: 'ERROR',
-          message: `ログインに失敗しました\n${settingsPath}を確認してください`
+          status: 'ERROR_LOGIN',
+          message: `ログインに失敗しました\n設定ファイルを確認してください`
         },
         settings, null, null);
       return;
@@ -234,15 +257,64 @@ async function init() {
       })();
     `);
 
-    console.log("★取得:", dates);
-    const fs = require('fs');
-    const path = require('path');
-    const dirPath = path.join(__dirname, 'project_list.json');
-    const projectListData = JSON.parse(fs.readFileSync(dirPath, 'utf-8'));
-    console.log("★projectData取得:", projectListData.length);
+    const prc_processCode = await hiddenWin.webContents.executeJavaScript(`prc_processCode;`);
+    const prc_processName = await hiddenWin.webContents.executeJavaScript(`prc_processName;`);
+    const prc_processType = await hiddenWin.webContents.executeJavaScript(`prc_processType;`);
+    const mem_projectCode = await hiddenWin.webContents.executeJavaScript(`mem_projectCode;`);
+    const mem_processType = await hiddenWin.webContents.executeJavaScript(`mem_processType;`);
+    const PJ = await hiddenWin.webContents.executeJavaScript(`
+      let PJ = {};
+      const sel = document.getElementById('projectcd');
+      for (let i = 0; i < sel.options.length; i++) {
+        const opt = sel.options[i];
+        PJ[opt.value] = opt.text;
+      }
+      PJ;
+    `);
+    const projectList = [];
+
+    for (let i = 0; i < mem_projectCode.length; i++) {
+      const processList = [];
+      for (let j = 0; j < prc_processCode.length; j++) {
+        if (prc_processType[j] == mem_processType[i]) {
+          processList.push(
+            {
+              processCode: prc_processCode[j],
+              processName: prc_processName[j]
+            }
+          );
+        }
+      }
+      if (PJ[mem_projectCode[i]]) {
+        projectList.push(
+          {
+            projectCode: mem_projectCode[i],
+            projectName: PJ[mem_projectCode[i]],
+            processList: processList
+          }
+        );
+      }
+    }
+    const priorityWords = settings.project_sort_order;
+
+    const getRank = (name) => {
+      const idx = priorityWords.findIndex(w => name.includes(w));
+      return idx === -1 ? priorityWords.length : idx;
+    };
+
+    projectList.sort((a, b) => {
+      const rankDiff = getRank(a.projectName) - getRank(b.projectName);
+      if (rankDiff !== 0) return rankDiff;
+      return a.projectCode.localeCompare(b.projectCode, "ja");
+    });
+    console.log('★before', projectList.length);
+    const projectListFiltered = projectList.filter((item) => {
+      return item.projectCode !== '--------';
+    })
+    console.log('★after', projectListFiltered.length);
 
     // ✅ rendererへ送る
-    mainWin.webContents.send('init-dates', { status: 'OK' }, settings, dates, projectListData);
+    mainWin.webContents.send('init-dates', { status: 'OK' }, settings, dates, projectListFiltered);
 
   } catch (e) {
     console.error("★エラー:", e);
@@ -258,6 +330,18 @@ ipcMain.handle('submitWork', async (event, param) => {
   console.log('★submitWork tasks', param);
   if (param.action === 'close') {
     app.quit();
+    return;
+  }
+  if (param.action === 'editSettings') {
+    const child = spawn('notepad.exe', [settingsPath]);
+    await new Promise((resolve, reject) => {
+      child.on('close', resolve);
+      child.on('error', reject);
+    });
+    return;
+  }
+  if (param.action === 'init') {
+    await init();
     return;
   }
 
@@ -277,7 +361,6 @@ ipcMain.handle('submitWork', async (event, param) => {
       /* SUBMIT */
       document.f1.submit();
     `;
-    console.log('★SCRIPT', jsScript);
     await hiddenWin.webContents.executeJavaScript(jsScript);
     console.log('★SCRIPT DONE');
   } catch (e) {

@@ -9,6 +9,7 @@
             <tr>
               <td class="title">今日もお疲れさまでした</td>
               <td class=" version">version 1.00</td>
+              <td class="title" align="right"><img src="image/gear.png" class="gear" onClick="editSettings()" /></td>
             </tr>
           </tbody>
         </table>
@@ -16,14 +17,19 @@
     </tr>
 
 </table>
-<div id="dateList" style="display:flex; margin:10px;">Loading....</div>
-<div id="projectChips" style="display:flex;margin:5px;flex-wrap:wrap;"></div>
+<div id="dateList" style="display:flex; margin:10px;">取得中....</div>
+<div class="project_chips" id="projectChipsFrame" style="display:none">
+  <span class="project_chips_title">よく使うタスク：登録したタスクはここに表示されます。×ボタンで消すこともできます</span>
+  <div id="projectChips" class="project_chips_container"></div>
+</div>
 <div id="nippouList"></div>
 
 <pre>
 </pre>
 <script src="https://cdn.jsdelivr.net/npm/decimal.js"></script>
 <script>
+  // TODO
+  // ログイン失敗時に、settings.jsonを開き、編集後、再起動を促す
   let selectedDate = null;
   let dateButtons = [];
   let nippous = [];
@@ -35,11 +41,18 @@
   const PROJECT_CHIPS_KEY = 'ProjectChipsKey';
 
   window.api.onInitDates(async (stats, _settings, dates, _projectListData) => {
+    console.log('●onInitDates', stats, _settings, dates, _projectListData);
     projectListData = _projectListData;
     settings = _settings;
-    if (stats.status === 'ERROR') {
+    if (stats.status === 'ERROR_NETWORK') {
       alert(stats.message);
       const res = await window.api.submitWork({ action: 'close' });
+    }
+    if (stats.status === 'ERROR_LOGIN') {
+      alert(stats.message);
+      await window.api.submitWork({ action: 'editSettings' });
+      alert('再度ログインを試みます。');
+      await window.api.submitWork({ action: 'init' });
     }
 
     await new Promise(requestAnimationFrame);
@@ -106,7 +119,7 @@
     console.log("●projectListData:", projectListData.length);
     const blank = document.createElement('option');
     blank.value = '';
-    blank.text = '選択してください';
+    blank.text = 'リストから選択、または、よく使うタスクから選択';
     projectListSelect.appendChild(blank);
 
     projectListData.forEach(project => {
@@ -152,10 +165,16 @@
       );
       projectChips.appendChild(chipEle);
     }
+    if (CHIPS.length > 0) {
+      document.getElementById('projectChipsFrame').style.display = 'block';
+    } else {
+      document.getElementById('projectChipsFrame').style.display = 'none';
+    }
   }
 
   const makeNippouList = () => {
     let html = '<table class="t1" style="margin:10px;width:98%;">';
+    html += '<tr><td colspan=4 align="right" style="border-top:none; border-right:none; border-left:none; background-image: url(image/bbk1.png);font-size:16px;color:#ff0000">時計アイコンクリックで残り時間を調整します<b>↓</b></td></tr>';
     html += '<tr><th width=30px>削</th><th width="80%">タスク</th><th>時間</th><th>調整</th></tr>';
     let idx = 0;
     let totalHour = new Decimal(0);
@@ -171,7 +190,7 @@
     });
     html += `<tr><td></td><td><div id="projectList"></div></td><td></dt><td></td></tr>`;
     html += `<tr><td colspan=2>合計</td><td align="center">${totalHour.toFixed(1)}</td><td></td></tr>`;
-    html += `<tr><td colspan=5 align="center"><button onClick=submit() style="height:40px;width:100px;font-size:16px;">送信</button></tr>`;
+    html += `<tr><td colspan=5 align="center"><button onClick=submit() style="height:40px;width:400px;font-size:16px;">プロジェクト管理システムに登録する</button></tr>`;
     html += '</table>';
     const nippouList = document.getElementById('nippouList');
     nippouList.innerHTML = html;
@@ -322,6 +341,10 @@
       alert('登録完了');
     }
     submitWork(tasks);
+  }
+  const editSettings = async () => {
+    await window.api.submitWork({ action: 'editSettings' });
+
   }
 
 </script>

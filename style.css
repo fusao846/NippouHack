@@ -855,3 +855,42 @@ select {
     font-size: 16px;
     height: 40px;
 }
+
+.gear {
+    width: 26px;
+    height: 26px;
+}
+
+.gear:hover {
+    cursor: pointer;
+    background: #eeeeee;
+}
+
+.project_chips {
+    position: relative;
+    display: flex;
+    flex-wrap: wrap;
+    margin: 10px;
+    margin-top: 15px;
+    padding: 5px;
+    border: 3px solid #666;
+    border-radius: 8px;
+}
+
+.project_chips_container {
+    position: relative;
+    display: flex;
+    flex-wrap: wrap;
+    margin: 10px;
+}
+
+.project_chips_title {
+    position: absolute;
+    font-size: 20px;
+    top: -13px;
+    left: 15px;
+    border: 2px solid #666;
+    border-radius: 3px;
+    background-image: url(image/bbk1.png);
+    padding: 0 8px;
+}
