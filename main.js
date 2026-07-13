@@ -20,7 +20,7 @@ let DEV_TOOL = false;
 let BROWSER_OPEN = false;
 let BROWSER_DEV_TOOL = false;
 const WIDTH = 1200;
-const HEIGHT = 700;
+const HEIGHT = 900;
 
 
 const settingsPath = path.join(
@@ -29,9 +29,7 @@ const settingsPath = path.join(
 );
 const getSettings = () => {
 
-  console.log("settingsPath", settingsPath);
   settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
-  console.log("settings", settings);
   LOGIN_ID = settings.login_id;
   LOGIN_PW = settings.password;
   LOGIN_URL = settings.url;
@@ -156,7 +154,7 @@ async function init() {
       mainWin.webContents.send('init-dates',
         {
           status: 'ERROR_LOGIN',
-          message: `ログイン情報が設定されていません\n${settingsPath}を確認してください`
+          message: `ログイン情報が設定されていません\n設定ファイルを確認してください`
         },
         settings, null, null);
       return;
@@ -259,15 +257,64 @@ async function init() {
       })();
     `);
 
-    console.log("★取得:", dates);
-    const fs = require('fs');
-    const path = require('path');
-    const dirPath = path.join(__dirname, 'project_list.json');
-    const projectListData = JSON.parse(fs.readFileSync(dirPath, 'utf-8'));
-    console.log("★projectData取得:", projectListData.length);
+    const prc_processCode = await hiddenWin.webContents.executeJavaScript(`prc_processCode;`);
+    const prc_processName = await hiddenWin.webContents.executeJavaScript(`prc_processName;`);
+    const prc_processType = await hiddenWin.webContents.executeJavaScript(`prc_processType;`);
+    const mem_projectCode = await hiddenWin.webContents.executeJavaScript(`mem_projectCode;`);
+    const mem_processType = await hiddenWin.webContents.executeJavaScript(`mem_processType;`);
+    const PJ = await hiddenWin.webContents.executeJavaScript(`
+      let PJ = {};
+      const sel = document.getElementById('projectcd');
+      for (let i = 0; i < sel.options.length; i++) {
+        const opt = sel.options[i];
+        PJ[opt.value] = opt.text;
+      }
+      PJ;
+    `);
+    const projectList = [];
+
+    for (let i = 0; i < mem_projectCode.length; i++) {
+      const processList = [];
+      for (let j = 0; j < prc_processCode.length; j++) {
+        if (prc_processType[j] == mem_processType[i]) {
+          processList.push(
+            {
+              processCode: prc_processCode[j],
+              processName: prc_processName[j]
+            }
+          );
+        }
+      }
+      if (PJ[mem_projectCode[i]]) {
+        projectList.push(
+          {
+            projectCode: mem_projectCode[i],
+            projectName: PJ[mem_projectCode[i]],
+            processList: processList
+          }
+        );
+      }
+    }
+    const priorityWords = settings.project_sort_order;
+
+    const getRank = (name) => {
+      const idx = priorityWords.findIndex(w => name.includes(w));
+      return idx === -1 ? priorityWords.length : idx;
+    };
+
+    projectList.sort((a, b) => {
+      const rankDiff = getRank(a.projectName) - getRank(b.projectName);
+      if (rankDiff !== 0) return rankDiff;
+      return a.projectCode.localeCompare(b.projectCode, "ja");
+    });
+    console.log('★before', projectList.length);
+    const projectListFiltered = projectList.filter((item) => {
+      return item.projectCode !== '--------';
+    })
+    console.log('★after', projectListFiltered.length);
 
     // ✅ rendererへ送る
-    mainWin.webContents.send('init-dates', { status: 'OK' }, settings, dates, projectListData);
+    mainWin.webContents.send('init-dates', { status: 'OK' }, settings, dates, projectListFiltered);
 
   } catch (e) {
     console.error("★エラー:", e);
@@ -314,7 +361,6 @@ ipcMain.handle('submitWork', async (event, param) => {
       /* SUBMIT */
       document.f1.submit();
     `;
-    console.log('★SCRIPT', jsScript);
     await hiddenWin.webContents.executeJavaScript(jsScript);
     console.log('★SCRIPT DONE');
   } catch (e) {

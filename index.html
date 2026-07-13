@@ -17,8 +17,11 @@
     </tr>
 
 </table>
-<div id="dateList" style="display:flex; margin:10px;">Loading....</div>
-<div id="projectChips" style="display:flex;margin:5px;flex-wrap:wrap;"></div>
+<div id="dateList" style="display:flex; margin:10px;">取得中....</div>
+<div class="project_chips" id="projectChipsFrame" style="display:none">
+  <span class="project_chips_title">よく使うタスク：登録したタスクはここに表示されます。×ボタンで消すこともできます</span>
+  <div id="projectChips" class="project_chips_container"></div>
+</div>
 <div id="nippouList"></div>
 
 <pre>
@@ -48,7 +51,7 @@
     if (stats.status === 'ERROR_LOGIN') {
       alert(stats.message);
       await window.api.submitWork({ action: 'editSettings' });
-      alert('設定ファイルが変更されました。\n再度ログインを試みます。');
+      alert('再度ログインを試みます。');
       await window.api.submitWork({ action: 'init' });
     }
 
@@ -116,7 +119,7 @@
     console.log("●projectListData:", projectListData.length);
     const blank = document.createElement('option');
     blank.value = '';
-    blank.text = '選択してください';
+    blank.text = 'リストから選択、または、よく使うタスクから選択';
     projectListSelect.appendChild(blank);
 
     projectListData.forEach(project => {
@@ -162,10 +165,16 @@
       );
       projectChips.appendChild(chipEle);
     }
+    if (CHIPS.length > 0) {
+      document.getElementById('projectChipsFrame').style.display = 'block';
+    } else {
+      document.getElementById('projectChipsFrame').style.display = 'none';
+    }
   }
 
   const makeNippouList = () => {
     let html = '<table class="t1" style="margin:10px;width:98%;">';
+    html += '<tr><td colspan=4 align="right" style="border-top:none; border-right:none; border-left:none; background-image: url(image/bbk1.png);font-size:16px;color:#ff0000">時計アイコンクリックで残り時間を調整します<b>↓</b></td></tr>';
     html += '<tr><th width=30px>削</th><th width="80%">タスク</th><th>時間</th><th>調整</th></tr>';
     let idx = 0;
     let totalHour = new Decimal(0);
@@ -181,7 +190,7 @@
     });
     html += `<tr><td></td><td><div id="projectList"></div></td><td></dt><td></td></tr>`;
     html += `<tr><td colspan=2>合計</td><td align="center">${totalHour.toFixed(1)}</td><td></td></tr>`;
-    html += `<tr><td colspan=5 align="center"><button onClick=submit() style="height:40px;width:100px;font-size:16px;">送信</button></tr>`;
+    html += `<tr><td colspan=5 align="center"><button onClick=submit() style="height:40px;width:400px;font-size:16px;">プロジェクト管理システムに登録する</button></tr>`;
     html += '</table>';
     const nippouList = document.getElementById('nippouList');
     nippouList.innerHTML = html;
