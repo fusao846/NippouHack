@@ -1,4 +1,5 @@
 node_modules/
 HackNippou-win32-x64/
 Output/
+dist/
 *.lnk

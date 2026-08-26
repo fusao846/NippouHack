@@ -1,21 +1,35 @@
 {
   "devDependencies": {
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "@vitejs/plugin-react": "^4.7.0",
     "electron": "^41.7.1",
-    "electron-packager": "^17.1.2"
+    "electron-packager": "^17.1.2",
+    "typescript": "^7.0.2",
+    "vite": "^6.4.3"
   },
   "name": "hack-nippou",
   "productName": "HackNippou",
   "version": "1.0.0",
   "main": "main.js",
   "dependencies": {
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
+    "@mui/icons-material": "^9.3.1",
+    "@mui/material": "^9.3.1",
     "decimal.js": "^10.6.0",
     "electron-builder": "^26.15.3",
     "electron-store": "^11.0.2",
-    "fs": "^0.0.1-security"
+    "fs": "^0.0.1-security",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
   },
   "scripts": {
-    "nippou": "chcp 65001 && npx electron .",
-    "build": "chcp 65001 &&npx electron-packager . HackNippou --platform=win32 --icon=image/HackNippou.ico --arch=x64 --overwrite",
+    "nippou": "npm run build:ui && chcp 65001 && npx electron .",
+    "dev:ui": "vite",
+    "build:ui": "vite build",
+    "typecheck": "tsc --noEmit",
+    "build": "npm run build:ui && chcp 65001 && npx electron-packager . HackNippou --platform=win32 --icon=image/HackNippou.ico --arch=x64 --overwrite",
     "build:installer": "node copySettings.js && cmd /c \"C:\\Program Files (x86)\\Inno Setup 6\\ISCC.exe\" inno.iss"
   }
 }
