@@ -17,36 +17,36 @@ let LOGIN_ID = '';
 let LOGIN_PW = '';
 let LOGIN_URL = '';
 let DEV_TOOL = false;
-let BROWSER_OPEN = false;
-let BROWSER_DEV_TOOL = false;
 const WIDTH = 1200;
 const HEIGHT = 900;
 
-
-const settingsPath = path.join(
-  app.getPath("userData"),
-  "settings.json"
-);
 const getSettings = () => {
-
-  settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
+  console.log('◆getSettings');
+  settings = store.get(SETTINGS_KEY);
+  if (!settings) {
+    settings = {
+      login_id: "",
+      password: "",
+      url: "http://172.16.10.94:8081/dr/login.jsp",
+      dev_tool: false,
+      project_sort_order: ["【DH】", "【PD】", "【ALL】勤怠関連", "【ALL】"],
+    }
+  }
+  settings.dev_tool = false;
+  console.log('settings', settings);
   LOGIN_ID = settings.login_id;
   LOGIN_PW = settings.password;
   LOGIN_URL = settings.url;
   DEV_TOOL = settings.dev_tool;
-  BROWSER_OPEN = settings.browser_open;
-  BROWSER_DEV_TOOL = settings.browser_dev_tool;
-  console.log("LOGIN_ID", LOGIN_ID);
-  console.log("LOGIN_PW", LOGIN_PW);
-  console.log("LOGIN_URL", LOGIN_URL);
+  //DEV_TOOL = true;
+  store.set(SETTINGS_KEY, settings);
 }
 
-getSettings();
 
 const store = new Store({
   projectName: 'NippouHack'
 });
-
+getSettings();
 
 ipcMain.handle('store-get', (_, key) => {
   return store.get(key);
@@ -55,7 +55,6 @@ ipcMain.handle('store-get', (_, key) => {
 ipcMain.handle('store-set', (_, key, value) => {
   store.set(key, value);
 });
-
 
 function getLocalIPv4() {
   const interfaces = os.networkInterfaces();
@@ -87,6 +86,7 @@ function checkNetworkType(ip) {
 
 
 function createWindow() {
+  console.log('◆createWindow');
   mainWin = new BrowserWindow({
     width: WIDTH,
     height: HEIGHT,
@@ -100,20 +100,28 @@ function createWindow() {
     app.quit();
   });
 
-  mainWin.loadFile('index.html');
+  mainWin.loadFile(path.join(__dirname, 'dist', 'index.html'));
+  console.log('DEV_TOOL', DEV_TOOL);
   //開発者ツール
   if (DEV_TOOL) {
-    mainWin.webContents.openDevTools();
+    mainWin.webContents.openDevTools({ mode: 'detach' });
   }
+  mainWin.on('focus', () => {
+    console.log('main focus');
+  });
 
+  mainWin.on('blur', () => {
+    console.log('main blur');
+  });
+
+  console.log('hiddwnWin');
   // true:ブラウザ表示
   hiddenWin = new BrowserWindow(
     {
-      show: BROWSER_OPEN,
+      show: DEV_TOOL,
       width: 400,
       height: HEIGHT / 2,
       frame: false,
-      alwaysOnTop: true,
       focusable: false,
       webPreferences: {
         backgroundThrottling: false,
@@ -128,6 +136,7 @@ app.whenReady().then(createWindow);
 
 // ✅ 起動時一括処理
 async function init() {
+  console.log('◆init');
   try {
     console.log("★開始");
     getSettings();
@@ -145,6 +154,21 @@ async function init() {
         settings, null, null);
       return;
     }
+    const syncWindowPosition = () => {
+      if (!mainWin || !hiddenWin) return;
+
+      const [mainX, mainY] = mainWin.getPosition();
+      const [mainW, mainH] = mainWin.getSize();
+      hiddenWin.setPosition(mainX + mainW - 3, mainY);
+      hiddenWin.setBounds(200, mainH);
+    };
+    mainWin.once('ready-to-show', syncWindowPosition);
+    hiddenWin.once('ready-to-show', syncWindowPosition);
+    mainWin.on('move', syncWindowPosition);
+    mainWin.on('resize', syncWindowPosition);
+    mainWin.on('close', () => {
+      hiddenWin.close();
+    });
     console.log("★ログイン情報確認");
     console.log("LOGIN_ID", LOGIN_ID);
     console.log("LOGIN_PW", LOGIN_PW);
@@ -163,26 +187,11 @@ async function init() {
     // ①ログイン
     await hiddenWin.loadURL(LOGIN_URL);
     // 隠しブラウザの開発者ツール表示
-    if (BROWSER_DEV_TOOL) {
+    if (DEV_TOOL) {
       hiddenWin.webContents.openDevTools({ mode: 'detach' });
     }
     hiddenWin.webContents.on('did-finish-load', async () => {
       hiddenWin.webContents.setZoomFactor(0.7);
-    });
-    const syncWindowPosition = () => {
-      if (!mainWin || !hiddenWin) return;
-
-      const [mainX, mainY] = mainWin.getPosition();
-      const [mainW, mainH] = mainWin.getSize();
-      hiddenWin.setPosition(mainX + mainW - 3, mainY);
-      hiddenWin.setBounds(200, mainH);
-    };
-    mainWin.once('ready-to-show', syncWindowPosition);
-    hiddenWin.once('ready-to-show', syncWindowPosition);
-    mainWin.on('move', syncWindowPosition);
-    mainWin.on('resize', syncWindowPosition);
-    mainWin.on('close', () => {
-      hiddenWin.close();
     });
     await hiddenWin.webContents.executeJavaScript(`
       document.querySelector('input[name="loginid"]').value = "${LOGIN_ID}";
@@ -257,39 +266,39 @@ async function init() {
       })();
     `);
 
-    const prc_processCode = await hiddenWin.webContents.executeJavaScript(`prc_processCode;`);
-    const prc_processName = await hiddenWin.webContents.executeJavaScript(`prc_processName;`);
-    const prc_processType = await hiddenWin.webContents.executeJavaScript(`prc_processType;`);
-    const mem_projectCode = await hiddenWin.webContents.executeJavaScript(`mem_projectCode;`);
-    const mem_processType = await hiddenWin.webContents.executeJavaScript(`mem_processType;`);
-    const PJ = await hiddenWin.webContents.executeJavaScript(`
-      let PJ = {};
+    const jsPrcProcessCode = await hiddenWin.webContents.executeJavaScript(`prc_processCode;`);
+    const jsPrcProcessName = await hiddenWin.webContents.executeJavaScript(`prc_processName;`);
+    const jsPrcProcessType = await hiddenWin.webContents.executeJavaScript(`prc_processType;`);
+    const jsPrcPjsPemProjectCode = await hiddenWin.webContents.executeJavaScript(`mem_projectCode;`);
+    const jsPrcPjsPemProcessType = await hiddenWin.webContents.executeJavaScript(`mem_processType;`);
+    const projectOptionList = await hiddenWin.webContents.executeJavaScript(`
+      let projectOptionList = {};
       const sel = document.getElementById('projectcd');
       for (let i = 0; i < sel.options.length; i++) {
         const opt = sel.options[i];
-        PJ[opt.value] = opt.text;
+        projectOptionList[opt.value] = opt.text;
       }
-      PJ;
+      projectOptionList;
     `);
     const projectList = [];
 
-    for (let i = 0; i < mem_projectCode.length; i++) {
+    for (let i = 0; i < jsPrcPjsPemProjectCode.length; i++) {
       const processList = [];
-      for (let j = 0; j < prc_processCode.length; j++) {
-        if (prc_processType[j] == mem_processType[i]) {
+      for (let j = 0; j < jsPrcProcessCode.length; j++) {
+        if (jsPrcProcessType[j] == jsPrcPjsPemProcessType[i]) {
           processList.push(
             {
-              processCode: prc_processCode[j],
-              processName: prc_processName[j]
+              processCode: jsPrcProcessCode[j],
+              processName: jsPrcProcessName[j]
             }
           );
         }
       }
-      if (PJ[mem_projectCode[i]]) {
+      if (projectOptionList[jsPrcPjsPemProjectCode[i]]) {
         projectList.push(
           {
-            projectCode: mem_projectCode[i],
-            projectName: PJ[mem_projectCode[i]],
+            projectCode: jsPrcPjsPemProjectCode[i],
+            projectName: projectOptionList[jsPrcPjsPemProjectCode[i]],
             processList: processList
           }
         );
@@ -328,20 +337,43 @@ function sleep(ms) {
 
 ipcMain.handle('submitWork', async (event, param) => {
   console.log('★submitWork tasks', param);
+  // クローズボタン押されたときアプリを終了する
   if (param.action === 'close') {
     app.quit();
     return;
   }
-  if (param.action === 'editSettings') {
-    const child = spawn('notepad.exe', [settingsPath]);
-    await new Promise((resolve, reject) => {
-      child.on('close', resolve);
-      child.on('error', reject);
-    });
+  // 開発者ツールの表示切替
+  if (param.action === 'changeDevTool') {
+    settings.dev_tool = param.devTool;
+    if (settings.dev_tool) {
+      mainWin.webContents.openDevTools({ mode: 'detach' });
+      if (hiddenWin) {
+        hiddenWin.show();
+        hiddenWin.webContents.openDevTools({ mode: 'detach' });
+      }
+    } else {
+      mainWin.webContents.closeDevTools();
+      if (hiddenWin) {
+        hiddenWin.hide();
+        hiddenWin.webContents.closeDevTools();
+      }
+    }
     return;
   }
+  // ログイン処理
   if (param.action === 'init') {
+    settings.login_id = param.login_id;
+    if (param.password) {
+      settings.password = param.password;
+    }
+    store.set(SETTINGS_KEY, settings);
     await init();
+    return;
+  }
+  // 並び順の保存
+  if (param.action === 'save-sort-order') {
+    settings.project_sort_order = param.project_sort_order;
+    store.set(SETTINGS_KEY, settings);
     return;
   }
 

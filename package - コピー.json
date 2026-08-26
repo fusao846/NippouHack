@@ -1,0 +1,23 @@
+{
+  "devDependencies": {
+    "electron": "^41.7.1",
+    "electron-packager": "^17.1.2"
+  },
+  "name": "hack-nippou",
+  "productName": "HackNippou",
+  "version": "1.0.0",
+  "main": "main.js",
+  "dependencies": {
+    "@material/web": "^2.4.1",
+    "@shoelace-style/shoelace": "^2.20.1",
+    "decimal.js": "^10.6.0",
+    "electron-builder": "^26.15.3",
+    "electron-store": "^11.0.2",
+    "fs": "^0.0.1-security"
+  },
+  "scripts": {
+    "nippou": "chcp 65001 && npx electron .",
+    "build": "chcp 65001 &&npx electron-packager . HackNippou --platform=win32 --icon=image/HackNippou.ico --arch=x64 --overwrite",
+    "build:installer": "node copySettings.js && cmd /c \"C:\\Program Files (x86)\\Inno Setup 6\\ISCC.exe\" inno.iss"
+  }
+}
